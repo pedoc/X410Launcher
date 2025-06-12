@@ -100,7 +100,8 @@ namespace X410Launcher.ViewModels
             get => _isIndeterminate;
         }
 
-        private string _appId = "9NLP712ZMN9Q";
+        private string _appId = "9NLP712ZMN9Q"; //3.x
+        //private string _appId = "9PM8LP83G3L3"; //4.x
 
         public string AppId
         {
@@ -199,7 +200,8 @@ namespace X410Launcher.ViewModels
 
             if (File.Exists(fileName))
             {
-                var result = MessageBox.Show($"{fileName} exists,override it?","Warning", button: MessageBoxButton.YesNo);
+                var result = MessageBox.Show($"{fileName} exists,override it?", "Warning",
+                    button: MessageBoxButton.YesNo);
                 if (result == MessageBoxResult.No)
                 {
                     Process.Start(downloadPath);

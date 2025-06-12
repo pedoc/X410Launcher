@@ -67,7 +67,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to fetch packages", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
 
     private async void DownloadButton_Click(object sender, RoutedEventArgs e)
@@ -82,7 +85,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to download packages", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
     {
@@ -96,7 +102,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to install packages", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
 
     private async void UninstallButton_Click(object sender, RoutedEventArgs e)
@@ -111,7 +120,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to uninstall packages", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
 
     private async void KillButton_Click(object sender, RoutedEventArgs e)
@@ -126,8 +138,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to kill X410", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
 
     private void LaunchButton_Click(object sender, RoutedEventArgs e)
@@ -142,8 +156,10 @@ public partial class HomePage : Page
         {
             MessageBox.Show(ex.ToString(), "Failed to start X410", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-
-        EnableButtons();
+        finally
+        {
+            EnableButtons();
+        }
     }
     #endregion
 }

@@ -53,7 +53,7 @@
                     <DataGridTextColumn Header="Architecture" Binding="{Binding Architecture}" Width="Auto"/>
                     <DataGridTextColumn Header="Format" Binding="{Binding Format}" Width="Auto"/>
                     <DataGridTextColumn Header="SHA1" Binding="{Binding SHA1}" Width="Auto"/>
-                    <DataGridTextColumn Header="Expires at" Binding="{Binding ExpireTime}" Width="Auto"/>
+                    <DataGridTextColumn Header="Expires at" Binding="{Binding ExpireTime, StringFormat=\{0:yyyy-MM-dd HH:mm:ss\}}" Width="Auto"/>
                     <DataGridTextColumn Header="URL" Binding="{Binding URL}" Width="Auto"/>
                 </DataGrid.Columns>
             </wpfui:DataGrid>
