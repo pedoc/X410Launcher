@@ -19,7 +19,11 @@ public class MicrosoftStorePackage
     public string Token => _token;
 
     private List<PackageInfo> _locations = new();
-    public List<PackageInfo> Locations { get => _locations; }
+
+    public List<PackageInfo> Locations
+    {
+        get => _locations;
+    }
 
     public MicrosoftStorePackage(string token, string apiBase = "https://store.rg-adguard.net/api/")
     {
@@ -29,7 +33,11 @@ public class MicrosoftStorePackage
 
     public async Task LoadAsync()
     {
-        using var client = new HttpClient();
+        using var handler = new HttpClientHandler();
+        handler.UseProxy = true;
+        handler.Proxy = WebRequest.DefaultWebProxy;
+        handler.UseDefaultCredentials = true;
+        using var client = new HttpClient(handler);
         client.BaseAddress = new Uri(_apiBase);
         var response = await client.PostAsync("GetFiles", new FormUrlEncodedContent(new Dictionary<string, string>()
         {
@@ -51,9 +59,9 @@ public class MicrosoftStorePackage
         doc.LoadHtml(_responseString);
 
         var table = doc.DocumentNode.SelectSingleNode("//table[@class='tftable']")
-                    ?.Descendants("tr")
-                    ?.Where(tr => tr.Elements("td").Count() >= 1)
-                    ?.ToList() 
+                        ?.Descendants("tr")
+                        ?.Where(tr => tr.Elements("td").Count() >= 1)
+                        ?.ToList()
                     ?? (IList<HtmlNode>)Array.Empty<HtmlNode>();
 
         foreach (var row in table)
@@ -103,7 +111,8 @@ public class PackageInfo
     public DateTime ExpireTime { get; set; }
     public long? Size { get; private set; } = null;
 
-    public async Task DownloadAsync(PackageDownloadCallback? callback = null, int bufferLength = 32768, int maxRetries = 128)
+    public async Task DownloadAsync(PackageDownloadCallback? callback = null, int bufferLength = 32768,
+        int maxRetries = 128)
     {
         using var client = new HttpClient();
         using var response = await client.GetAsync(URL, HttpCompletionOption.ResponseHeadersRead);
@@ -123,8 +132,10 @@ public class PackageInfo
                 {
                     throw new Exception("Failed to download");
                 }
+
                 --retriesLeft;
             }
+
             bytesRead += currentRead;
             callback?.Invoke(buffer, currentRead, bytesRead, Size ?? -1);
         }

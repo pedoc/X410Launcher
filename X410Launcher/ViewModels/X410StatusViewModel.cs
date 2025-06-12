@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Xml.Serialization;
 using X410Launcher.Tools;
 
@@ -15,16 +16,22 @@ namespace X410Launcher.ViewModels
     public class X410StatusViewModel : ObservableObject
     {
         public const string StatusTextReady = "Ready.";
-        
+
         public const string StatusTextFetching = "Fetching packages from provider: {0}...";
         public const string StatusTextFetchFailed = "Failed to fetch packages.";
         public const string StatusTextFetchCompleted = "Fetched {0} packages.";
 
         public const string StatusTextDownloading = "Downloading package: {0}...";
-        public const string StatusTextDownloadExpired = "The selected package has expired. Please refresh your package list.";
+
+        public const string StatusTextDownloadExpired =
+            "The selected package has expired. Please refresh your package list.";
+
         public const string StatusTextDownloadFailed = "Failed to download package.";
-        public const string StatusTextDownloadArchNoSupport = "Your operating system architecture, {0}, is not supported.";
-        
+        public const string StatusTextDownloadCompleted = "Successfully downloaded package.";
+
+        public const string StatusTextDownloadArchNoSupport =
+            "Your operating system architecture, {0}, is not supported.";
+
         public const string StatusTextExtracting = "Extracting {0} to {1}...";
 
         public const string StatusTextInstallFailed = "Failed to install package.";
@@ -43,6 +50,7 @@ namespace X410Launcher.ViewModels
         public const int DownloadBufferSize = 32768;
 
         private string? _installedVersion;
+
         public string? InstalledVersion
         {
             get => _installedVersion;
@@ -50,6 +58,7 @@ namespace X410Launcher.ViewModels
         }
 
         private string? _latestVersion;
+
         public string? LatestVersion
         {
             get => _latestVersion;
@@ -57,6 +66,7 @@ namespace X410Launcher.ViewModels
         }
 
         private ObservableCollection<PackageInfo> _packages = new();
+
         public ObservableCollection<PackageInfo> Packages
         {
             get => _packages;
@@ -64,6 +74,7 @@ namespace X410Launcher.ViewModels
         }
 
         private string _statusText = StatusTextReady;
+
         public string StatusText
         {
             get => _statusText;
@@ -71,6 +82,7 @@ namespace X410Launcher.ViewModels
         }
 
         private double _progress = 0;
+
         public double Progress
         {
             get => _progress;
@@ -82,12 +94,14 @@ namespace X410Launcher.ViewModels
         }
 
         private bool _isIndeterminate = false;
+
         public bool ProgressIsIndeterminate
         {
             get => _isIndeterminate;
         }
 
         private string _appId = "9NLP712ZMN9Q";
+
         public string AppId
         {
             get => _appId;
@@ -95,6 +109,7 @@ namespace X410Launcher.ViewModels
         }
 
         private string _api = "https://store.rg-adguard.net/api/";
+
         public string Api
         {
             get => _api;
@@ -124,21 +139,24 @@ namespace X410Launcher.ViewModels
             Packages.Clear();
             Progress = ProgressIndeterminate;
             StatusText = string.Format(StatusTextFetching, _api);
-            
+
             try
             {
                 var msPackage = new MicrosoftStorePackage(_appId, _api);
                 await msPackage.LoadAsync();
                 var desiredPackageArchitectures = RuntimeInformation.OSArchitecture switch
                 {
-                    Architecture.X64 => new[] { Tools.PackageArchitecture.x64, Tools.PackageArchitecture.x86, Tools.PackageArchitecture.neutral },
+                    Architecture.X64 => new[]
+                    {
+                        Tools.PackageArchitecture.x64, Tools.PackageArchitecture.x86, Tools.PackageArchitecture.neutral
+                    },
                     Architecture.X86 => new[] { Tools.PackageArchitecture.x86, Tools.PackageArchitecture.neutral },
                     Architecture.Arm64 => new[] { Tools.PackageArchitecture.arm64, Tools.PackageArchitecture.neutral },
                     Architecture.Arm => new[] { Tools.PackageArchitecture.arm, Tools.PackageArchitecture.neutral },
                     _ => new[] { Tools.PackageArchitecture.neutral },
                 };
                 Packages = new ObservableCollection<PackageInfo>(
-                    msPackage.Locations.Where(p => 
+                    msPackage.Locations.Where(p =>
                         !p.Name.StartsWith("Microsoft.VCLibs") &&
                         desiredPackageArchitectures.Contains(p.Architecture)
                     ).OrderByDescending(p => p.Version));
@@ -154,6 +172,88 @@ namespace X410Launcher.ViewModels
 
             Progress = ProgressMax;
             StatusText = string.Format(StatusTextFetchCompleted, Packages.Count);
+        }
+
+
+        public async Task DownloadPackageAsync(int index)
+        {
+            var selectedPackage = _packages[index];
+
+            if (selectedPackage.ExpireTime <= DateTime.Now)
+            {
+                StatusText = StatusTextDownloadExpired;
+                RefreshInstalledVersion();
+                throw new InvalidOperationException(StatusTextDownloadExpired);
+            }
+
+            var appPath = Paths.GetAppInstallPath();
+            var appParentPath = Path.GetDirectoryName(appPath);
+            var downloadPath = Path.Combine(appParentPath!, "downloads");
+            if (!Directory.Exists(downloadPath))
+            {
+                Directory.CreateDirectory(downloadPath);
+            }
+
+            var fileName = Path.Combine(downloadPath,
+                $"{selectedPackage.PackageName}-{selectedPackage.Version}.{selectedPackage.Format}");
+
+            if (File.Exists(fileName))
+            {
+                var result = MessageBox.Show($"{fileName} exists,override it?","Warning", button: MessageBoxButton.YesNo);
+                if (result == MessageBoxResult.No)
+                {
+                    Process.Start(downloadPath);
+                    return;
+                }
+            }
+
+            StatusText = string.Format(StatusTextDownloading, selectedPackage.Name);
+            Progress = ProgressIndeterminate;
+            using var packageStream = new MemoryStream();
+
+            try
+            {
+                await selectedPackage.DownloadAsync((buffer, currentBytesRead, bytesRead, totalBytes) =>
+                {
+                    if (totalBytes > 0)
+                    {
+                        Progress = ProgressMin + ((ProgressMax - ProgressMin) * (bytesRead / (double)totalBytes));
+                    }
+                    else
+                    {
+                        Progress = -1;
+                    }
+
+                    packageStream.Write(buffer, 0, currentBytesRead);
+                });
+            }
+            catch
+            {
+                StatusText = StatusTextDownloadFailed;
+                Progress = ProgressMin;
+                RefreshInstalledVersion();
+                throw;
+            }
+
+            try
+            {
+                packageStream.Seek(0, SeekOrigin.Begin);
+                // ReSharper disable once UseAwaitUsing
+                using var file = File.Open(fileName, FileMode.Create, FileAccess.ReadWrite);
+                await packageStream.CopyToAsync(file);
+                await file.FlushAsync();
+
+                Progress = ProgressMax;
+                StatusText = StatusTextDownloadCompleted;
+
+                Process.Start(downloadPath);
+            }
+            catch
+            {
+                Progress = ProgressMin;
+                StatusText = StatusTextDownloadFailed;
+                throw;
+            }
         }
 
         public async Task InstallPackageAsync(int index)
@@ -172,7 +272,7 @@ namespace X410Launcher.ViewModels
             StatusText = string.Format(StatusTextDownloading, selectedPackage.Name);
             Progress = ProgressIndeterminate;
             using var packageStream = new MemoryStream();
-            
+
             try
             {
                 await selectedPackage.DownloadAsync((buffer, currentBytesRead, bytesRead, totalBytes) =>
@@ -185,6 +285,7 @@ namespace X410Launcher.ViewModels
                     {
                         Progress = -1;
                     }
+
                     packageStream.Write(buffer, 0, currentBytesRead);
                 });
             }
@@ -195,7 +296,7 @@ namespace X410Launcher.ViewModels
                 RefreshInstalledVersion();
                 throw;
             }
-            
+
             packageStream.Seek(0, SeekOrigin.Begin);
 
             try
@@ -219,17 +320,20 @@ namespace X410Launcher.ViewModels
                             _ => Models.AppxBundle.PackageArchitecture.Neutral
                         };
                         var package = bundle.Packages
-                                .FirstOrDefault(p => 
-                                    p.Architecture == architecture && 
-                                    p.Type == Models.AppxBundle.PackageType.Application);
+                            .FirstOrDefault(p =>
+                                p.Architecture == architecture &&
+                                p.Type == Models.AppxBundle.PackageType.Application);
                         if (package == null)
                         {
-                            var error = string.Format(StatusTextDownloadArchNoSupport, RuntimeInformation.OSArchitecture);
+                            var error = string.Format(StatusTextDownloadArchNoSupport,
+                                RuntimeInformation.OSArchitecture);
                             StatusText = error;
                             Progress = ProgressMin;
                             throw new InvalidOperationException(error);
                         }
-                        using var newPackageZipStream = zipArchive.Entries.First(e => e.FullName == package.FileName).Open();
+
+                        using var newPackageZipStream =
+                            zipArchive.Entries.First(e => e.FullName == package.FileName).Open();
                         // We don't know if disposing the old stream corrupts the zip archive.
                         // Therefore we use this temporary stream instead.
                         using var newPackageMemoryStream = new MemoryStream();
@@ -243,11 +347,11 @@ namespace X410Launcher.ViewModels
                         // Now, we have the desired appx file.
                         packageStream.Seek(0, SeekOrigin.Begin);
                     }
-                    break;
+                        break;
                     case PackageFormat.msix:
                     case PackageFormat.appx:
                         // Do nothing, we already have the appx stream.
-                    break;
+                        break;
                 }
 
                 using var appxArchive = new ZipArchive(packageStream);
@@ -276,10 +380,7 @@ namespace X410Launcher.ViewModels
                     else
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-                        await Task.Run(() =>
-                        {
-                            entry.ExtractToFile(fullPath, overwrite: true);
-                        });
+                        await Task.Run(() => { entry.ExtractToFile(fullPath, overwrite: true); });
                         extractedLength += entry.CompressedLength;
                     }
                 }

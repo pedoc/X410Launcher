@@ -35,6 +35,7 @@ public partial class HomePage : Page
     {
         RefreshButton.IsEnabled = false;
         InstallButton.IsEnabled = false;
+        DownloadButton.IsEnabled = false;
         UninstallButton.IsEnabled = false;
         LaunchButton.IsEnabled = false;
         KillButton.IsEnabled = false;
@@ -44,6 +45,7 @@ public partial class HomePage : Page
     {
         RefreshButton.IsEnabled = true;
         InstallButton.IsEnabled = _model.Packages.Any();
+        DownloadButton.IsEnabled = _model.Packages.Any();
         UninstallButton.IsEnabled = _model.InstalledVersion != null;
         LaunchButton.IsEnabled = _model.InstalledVersion != null;
         KillButton.IsEnabled = _model.InstalledVersion != null;
@@ -68,6 +70,20 @@ public partial class HomePage : Page
         EnableButtons();
     }
 
+    private async void DownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        DisableButtons();
+
+        try
+        {
+            await _model.DownloadPackageAsync(PackagesDataGrid.SelectedIndex);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.ToString(), "Failed to download packages", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        EnableButtons();
+    }
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
     {
         DisableButtons();
