@@ -1,0 +1,39 @@
+{
+  "FileVersion": 2,
+  "Id": "0db573da-6d35-dc76-ae7b-6863d5081ed2",
+  "Items": [
+    {
+      "Id": "1f23f281-0f31-4379-aab5-1d0c0d1f0e07",
+      "Command": "X410LauncherTray",
+      "LaunchProfile": "X410LauncherTray",
+      "Items": [
+        {
+          "Id": "a52c5fe5-ecd7-412d-986d-8cac374001da",
+          "Command": "--tray"
+        }
+      ]
+    },
+    {
+      "Id": "90591518-23c2-4f7b-8e44-54073b5bf194",
+      "Command": "X410LauncherUpdateLaunchTray",
+      "LaunchProfile": "X410LauncherUpdateLaunchTray",
+      "Items": [
+        {
+          "Id": "4956f55a-fcbc-448f-9b99-75de78ae7ee7",
+          "Command": "--no-ui --silent --update --launch --tray"
+        }
+      ]
+    },
+    {
+      "Id": "6fa548b6-d3c9-4107-b49a-cfcd807a7426",
+      "Command": "X410LauncherSilentInstall",
+      "LaunchProfile": "X410LauncherSilentInstall",
+      "Items": [
+        {
+          "Id": "b18592f2-c79c-4f51-8d3f-25aa6c6c2eb0",
+          "Command": "--no-ui --install --force --launch"
+        }
+      ]
+    }
+  ]
+}

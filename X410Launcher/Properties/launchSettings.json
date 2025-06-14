@@ -1,8 +1,7 @@
 {
   "profiles": {
     "X410Launcher": {
-      "commandName": "Project",
-      "commandLineArgs": ""
+      "commandName": "Project"
     },
     "X410LauncherTray": {
       "commandName": "Project",

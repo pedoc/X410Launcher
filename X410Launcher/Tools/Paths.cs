@@ -16,6 +16,11 @@ public static class Paths
         return Process.GetCurrentProcess().MainModule!.FileName!;
     }
 
+    public static string GetLauncherFileDirectory()
+    {
+        return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule!.FileName!)!;
+    }
+
     public static string GetAppInstallPath()
     {
         return Path.Combine(
