@@ -153,7 +153,7 @@ namespace X410Launcher.ViewModels
             try
             {
                 MicrosoftStorePackage msPackage;
-                if (useLocalCache && !File.Exists(_localPackageCache))
+                if (!useLocalCache || !File.Exists(_localPackageCache))
                 {
                     msPackage = new MicrosoftStorePackage(_appId, _api);
                     await msPackage.LoadAsync();

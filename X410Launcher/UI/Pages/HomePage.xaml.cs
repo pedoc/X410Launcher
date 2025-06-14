@@ -31,6 +31,7 @@ public partial class HomePage : Page
     }
 
     #region Buttons
+
     private void DisableButtons()
     {
         RefreshButton.IsEnabled = false;
@@ -49,6 +50,28 @@ public partial class HomePage : Page
         UninstallButton.IsEnabled = _model.InstalledVersion != null;
         LaunchButton.IsEnabled = _model.InstalledVersion != null;
         KillButton.IsEnabled = _model.InstalledVersion != null;
+    }
+
+    private async void ForceRefreshButton_Click(object? sender, RoutedEventArgs? e)
+    {
+        DisableButtons();
+
+        try
+        {
+            await _model.RefreshAsync(false);
+            if (_model.Packages.Any())
+            {
+                PackagesDataGrid.SelectedIndex = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.ToString(), "Failed to fetch packages", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            EnableButtons();
+        }
     }
 
     private async void RefreshButton_Click(object? sender, RoutedEventArgs? e)
@@ -90,6 +113,7 @@ public partial class HomePage : Page
             EnableButtons();
         }
     }
+
     private async void InstallButton_Click(object sender, RoutedEventArgs e)
     {
         DisableButtons();
@@ -161,5 +185,6 @@ public partial class HomePage : Page
             EnableButtons();
         }
     }
+
     #endregion
 }

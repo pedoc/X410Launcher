@@ -60,6 +60,8 @@
             </wpfui:DataGrid>
         </Grid>
         <StackPanel Grid.Row="1" Orientation="Horizontal" FlowDirection="RightToLeft" Margin="10, 0, 10, 0">
+            <Button x:Name="ForceRefreshButton" Content="Force Refresh" Click="ForceRefreshButton_Click" />
+            <Border Width="10"/>
             <Button x:Name="RefreshButton" Content="Refresh" Click="RefreshButton_Click" />
             <Border Width="10"/>
             <Button x:Name="InstallButton" Content="Install selected version" Click="InstallButton_Click" IsEnabled="False" />
