@@ -1,0 +1,2 @@
+set PATH=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin;%PATH%
+cmake -S . -B build-arm64 -G Ninja -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_FLAGS="--target=arm64-windows -fuse-ld=lld" -DCMAKE_CXX_FLAGS="--target=arm64-windows -fuse-ld=lld" -DVCPKG_TARGET_TRIPLET=arm64-windows-static
