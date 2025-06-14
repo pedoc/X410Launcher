@@ -1,7 +1,8 @@
 {
   "profiles": {
     "X410Launcher": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "nativeDebugging": true
     },
     "X410LauncherTray": {
       "commandName": "Project",
