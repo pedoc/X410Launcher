@@ -1,7 +1,7 @@
 #include <Windows.h>
 
 #include <detours.h>
-
+#include <iterator>
 #include <algorithm>
 #include <string>
 
