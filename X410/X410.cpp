@@ -13,6 +13,9 @@ extern "C" {
 
 #include <detours/detours.h>
 
+extern "C" void RestoreContextAndJump_x64(CONTEXT* context);
+extern "C" void RestoreContextAndJump_arm64(CONTEXT* context);
+
 static decltype(&MessageBoxW) RealMessageBoxW = MessageBoxW;
 static decltype(&RegisterClassExW) RealRegisterClassExW = RegisterClassExW;
 
@@ -98,79 +101,14 @@ int WINAPI HookMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uT
             IsFirstMessage = FALSE;
 
 #if defined(_M_X64)
-            // MSVC inline assembly
-            __asm {
-                // Restore general-purpose registers (non-volatile)
-                // Note: MSVC __asm can directly access local variables like 'context'
-                mov rbx, context.Rbx;
-                mov rsi, context.Rsi;
-                mov rdi, context.Rdi;
-                mov r12, context.R12;
-                mov r13, context.R13;
-                mov r14, context.R14;
-                mov r15, context.R15;
-
-                // Prepare for jump: target RIP in RCX, target RBP in RDX (as in original)
-                mov rcx, context.Rip; 
-                mov rdx, context.Rbp; // Temporarily store target RBP in RDX
-
-                // Restore stack pointer
-                mov rsp, context.Rsp;
-
-                // Restore frame pointer (RBP) - done after RSP to avoid issues if RBP is used for stack access
-                mov rbp, rdx;         // Restore RBP from RDX (which holds context.Rbp)
-
-                // Set return value (RAX for x64) to 1 (e.g., IDOK)
-                mov rax, 1;
-
-                // Jump to the original return address (stored in context.Rip)
-                jmp rcx;
-            }
+            RestoreContextAndJump_x64(&context);
 #elif defined(_M_ARM64)
-            // MSVC inline assembly for ARM64
-            // Note: The CONTEXT structure for ARM64 stores X0-X28, Fp (X29), Lr (X30), Sp, Pc.
-            // Callee-saved registers are typically X19-X28, Fp (X29), Lr (X30).
-            __asm {
-                // Restore callee-saved registers X19-X28
-                ldr     x19, [context, #OFFSET_OF_X19_IN_CONTEXT_STRUCT]; // Use actual struct member access below
-                ldr     x19, context.X19;
-                ldr     x20, context.X20;
-                ldr     x21, context.X21;
-                ldr     x22, context.X22;
-                ldr     x23, context.X23;
-                ldr     x24, context.X24;
-                ldr     x25, context.X25;
-                ldr     x26, context.X26;
-                ldr     x27, context.X27;
-                ldr     x28, context.X28;
-
-                // Restore Frame Pointer (X29) and Link Register (X30)
-                ldr     x29, context.Fp;   // Fp is X29
-                ldr     x30, context.Lr;   // Lr is X30
-
-                // Set return value (X0 for ARM64) to 1
-                mov     x0, #1;
-                
-                // Restore Stack Pointer
-                mov     sp, context.Sp;
-
-                // Branch to the original program counter (return address)
-                // Note: context.Pc holds the address to "return" to.
-                // We need to load it into a register if 'br' cannot take it directly from memory,
-                // but MSVC __asm might handle 'br context.Pc' if context.Pc is directly accessible.
-                // Let's assume it can be loaded into a temporary register if needed,
-                // but direct use is cleaner if supported.
-                // The original GCC used 'br %1' where %1 was 'context.Pc' passed as a register operand.
-                // For MSVC, loading it into a scratch register like X16 (IP0) or X17 (IP1) is safe.
-                ldr     x16, context.Pc; // Load target PC into a scratch register
-                br      x16;             // Branch to the address in X16
-            }
+            RestoreContextAndJump_arm64(&context);
 #else
 #error Restore context for this architecture!
 #endif
-            // This part of the code will not be reached if the assembly jump occurs.
-            // __builtin_unreachable() equivalent in MSVC
-            __assume(0);
+            // The assembly functions will not return here.
+            __assume(0); // Tell MSVC this code path is unreachable.
         }
     }
 
@@ -231,6 +169,7 @@ static void WaitForDebugger()
 
 	DebugBreak();
 }
+
 
 extern "C"
 __declspec(dllexport)

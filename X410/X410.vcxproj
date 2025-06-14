@@ -209,6 +209,8 @@
     <ClCompile Include="X410.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="restore_context_arm64.asm" />
+    <None Include="restore_context_x64.asm" />
     <None Include="vcpkg-configuration.json" />
     <None Include="vcpkg.json" />
   </ItemGroup>
