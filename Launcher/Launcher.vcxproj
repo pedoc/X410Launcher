@@ -26,6 +26,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <PropertyGroup>
+    <PlatformUpperCase Condition="'$(Platform)' == 'x64'">X64</PlatformUpperCase>
+    <PlatformUpperCase Condition="'$(Platform)' == 'x86'">X86</PlatformUpperCase>
+    <PlatformUpperCase Condition="'$(Platform)' == 'arm64'">ARM64</PlatformUpperCase>
+  </PropertyGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -98,15 +103,15 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetName>$(ProjectName).$(Platform)</TargetName>
+    <TargetName>$(ProjectName).$(PlatformUpperCase)</TargetName>
     <OutDir>$(SolutionDir)X410Launcher\Native</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <TargetName>$(ProjectName).$(Platform)</TargetName>
+    <TargetName>$(ProjectName).$(PlatformUpperCase)</TargetName>
     <OutDir>$(SolutionDir)X410Launcher\Native</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>$(ProjectName).$(Platform)</TargetName>
+    <TargetName>$(ProjectName).$(PlatformUpperCase)</TargetName>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <OutDir>$(SolutionDir)X410Launcher\Native</OutDir>
   </PropertyGroup>
