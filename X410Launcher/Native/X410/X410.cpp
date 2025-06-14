@@ -169,6 +169,7 @@ ATOM HookRegisterClassExW(const PWNDCLASSEXW pWndClassEx)
 }
 
 extern "C"
+__declspec(dllexport)
 BOOL WINAPI
 DllMain(HINSTANCE hinst, DWORD dwReason, LPVOID reserved)
 {
