@@ -1,0 +1,7 @@
+{
+	"name": "x410-native-x410",
+	"version-string": "1.0.0",
+	"dependencies": [
+		"detours"
+	]
+}
