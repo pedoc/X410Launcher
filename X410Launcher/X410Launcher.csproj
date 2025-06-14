@@ -20,6 +20,7 @@
     <PackageReference Include="MemoryModule" Version="0.2.0-dev.63" />
     <PackageReference Include="securifybv.ShellLink" Version="0.1.0" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.6" />
+    <PackageReference Include="System.Text.Json" Version="9.0.6" />
     <PackageReference Include="WPF-UI" Version="4.0.3" />
     <PackageReference Include="WPF-UI.Tray" Version="4.0.3" />
   </ItemGroup>
@@ -31,6 +32,17 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Native/*.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Native\Launcher.ARM64.exp" />
+    <None Remove="Native\Launcher.ARM64.lib" />
+    <None Remove="Native\Launcher.ARM64.pdb" />
+    <None Remove="Native\Launcher.x64.exp" />
+    <None Remove="Native\Launcher.x64.lib" />
+    <None Remove="Native\Launcher.x64.pdb" />
+    <None Remove="Native\X410.ARM64.pdb" />
+    <None Remove="Native\X410.x64.pdb" />
   </ItemGroup>
 
 </Project>

@@ -31,26 +31,36 @@ public class MicrosoftStorePackage
         _apiBase = apiBase;
     }
 
+    public MicrosoftStorePackage(string token, string apiBase, string responseString) : this(token, apiBase)
+    {
+        _responseString = responseString;
+    }
+
     public async Task LoadAsync()
     {
-        using var handler = new HttpClientHandler();
-        handler.UseProxy = true;
-        handler.Proxy = WebRequest.DefaultWebProxy;
-        handler.UseDefaultCredentials = true;
-        using var client = new HttpClient(handler);
-        client.BaseAddress = new Uri(_apiBase);
-        var response = await client.PostAsync("GetFiles", new FormUrlEncodedContent(new Dictionary<string, string>()
+        if (string.IsNullOrEmpty(_responseString))
         {
-            { "type", "ProductId" },
-            { "url", _token },
-        }));
+            using var handler = new HttpClientHandler();
+            handler.UseProxy = true;
+            handler.Proxy = WebRequest.DefaultWebProxy;
+            handler.UseDefaultCredentials = true;
+            using var client = new HttpClient(handler);
+            client.BaseAddress = new Uri(_apiBase);
+            var response = await client.PostAsync("GetFiles", new FormUrlEncodedContent(new Dictionary<string, string>()
+            {
+                { "type", "ProductId" },
+                { "url", _token },
+            }));
 
-        response.EnsureSuccessStatusCode();
+            response.EnsureSuccessStatusCode();
 
-        _responseString = await response.Content.ReadAsStringAsync();
+            _responseString = await response.Content.ReadAsStringAsync();
+        }
 
         ParseLocations();
     }
+
+    public string GetResponseString() => _responseString;
 
     private void ParseLocations()
     {
