@@ -49,7 +49,8 @@ namespace X410Launcher.ViewModels
         public const string StatusTextLaunched = "Sucessfully started X410 process.";
         public const string StatusTextLaunchFailed = "Failed to start X410 process.";
 
-        public const string StatusTextCloseAppsFirst = "There are active X clients. Please close your apps before proceeding.";
+        public const string StatusTextCloseAppsFirst =
+            "There are active X clients. Please close your apps before proceeding.";
 
         public const double ProgressIndeterminate = -1;
         public const double ProgressMin = 0;
@@ -70,6 +71,7 @@ namespace X410Launcher.ViewModels
         }
 
         private string? _installedArchitecture;
+
         public string? InstalledArchitecture
         {
             get => _installedArchitecture;
@@ -85,6 +87,7 @@ namespace X410Launcher.ViewModels
         }
 
         private bool _isRunning;
+
         public bool IsRunning
         {
             get => _isRunning;
@@ -92,6 +95,7 @@ namespace X410Launcher.ViewModels
         }
 
         private uint? _displayNumber;
+
         public uint? DisplayNumber
         {
             get => _displayNumber;
@@ -99,6 +103,7 @@ namespace X410Launcher.ViewModels
         }
 
         public string? _subscriptionStatus;
+
         public string? SubscriptionStatus
         {
             get => _subscriptionStatus;
@@ -195,17 +200,19 @@ namespace X410Launcher.ViewModels
                 X410.SubscriptionStatus.TrialValid
                     => "Trial",
                 X410.SubscriptionStatus.SubscriptionExpired or
-                X410.SubscriptionStatus.TrialExpired
+                    X410.SubscriptionStatus.TrialExpired
                     => "Expired",
                 X410.SubscriptionStatus.NoAppUseEntitlement or
-                X410.SubscriptionStatus.StoreError
+                    X410.SubscriptionStatus.StoreError
                     => "Error",
                 X410.SubscriptionStatus.Unknown or _
                     => "Unknown"
             };
         }
 
-        public async Task RefreshAsync()
+        private static readonly string LocalPackageCache = Path.Combine(Paths.GetLauncherFileDirectory(), ".pkg-cache");
+
+        public async Task RefreshAsync(bool useLocalCache = true)
         {
             RefreshInstalledVersion();
             RefreshAppStatus();
@@ -218,23 +225,23 @@ namespace X410Launcher.ViewModels
             try
             {
                 MicrosoftStorePackage msPackage;
-                if (!useLocalCache || !File.Exists(_localPackageCache))
+                if (!useLocalCache || !File.Exists(LocalPackageCache))
                 {
                     msPackage = new MicrosoftStorePackage(_appId, _api);
                     await msPackage.LoadAsync();
 #if NETFRAMEWORK
-                    File.WriteAllText(_localPackageCache, msPackage.GetResponseString());
+                    File.WriteAllText(LocalPackageCache, msPackage.GetResponseString());
 #else
-                    await File.WriteAllTextAsync(_localPackageCache, msPackage.GetResponseString());
+                    await File.WriteAllTextAsync(LocalPackageCache, msPackage.GetResponseString());
 #endif
                     from = "Remote";
                 }
                 else
                 {
 #if NETFRAMEWORK
-                    var pkgCache = File.ReadAllText(_localPackageCache);
+                    var pkgCache = File.ReadAllText(LocalPackageCache);
 #else
-                    var pkgCache = await File.ReadAllTextAsync(_localPackageCache);
+                    var pkgCache = await File.ReadAllTextAsync(LocalPackageCache);
 #endif
                     msPackage = new MicrosoftStorePackage(_appId, _api, pkgCache);
                     await msPackage.LoadAsync();
@@ -648,7 +655,6 @@ namespace X410Launcher.ViewModels
             });
 
             RefreshAppStatus();
-        }
         }
     }
 }
