@@ -8,6 +8,7 @@ project(X410)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# add_compile_options(-fno-omit-frame-pointer -O0 -g)
 
 set(ARCH_TAG "UNKNOWN")
 

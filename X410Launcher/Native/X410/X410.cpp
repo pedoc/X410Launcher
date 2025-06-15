@@ -17,6 +17,8 @@ static decltype(&RegisterClassExW) RealRegisterClassExW = RegisterClassExW;
 
 int WINAPI HookMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
+    // return RealMessageBoxW(hWnd, lpText, lpCaption, uType);
+
     static BOOL IsFirstMessage = TRUE;
 
     if (IsFirstMessage)
@@ -75,70 +77,68 @@ int WINAPI HookMessageBoxW(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uT
             IsFirstMessage = FALSE;
 
 #if defined(_M_X64)
-            __asm__ volatile(
-                "mov %0, %%rbx;"
-                // "mov %1, %%rbp;"
-                "mov %2, %%rsi;"
-                "mov %3, %%rdi;"
-                "mov %4, %%r12;"
-                "mov %5, %%r13;"
-                "mov %6, %%r14;"
-                "mov %7, %%r15;"
-
-                "mov %9, %%rcx;"
-                "mov %1, %%rdx;"
-
-                "mov %8, %%rsp;"
-
-                // Only mess with rbp after everything else's done.
-                "mov %%rdx, %%rbp;"
-
-                "mov $1, %%rax;"
-
-                "jmp *%%rcx;"
-                :
-                :   "m" (context.Rbx),
-                    "m" (context.Rbp),
-                    "m" (context.Rsi),
-                    "m" (context.Rdi),
-                    "m" (context.R12),
-                    "m" (context.R13),
-                    "m" (context.R14),
-                    "m" (context.R15),
-
-                    "m" (context.Rsp),
-                    "m" (context.Rip)
-                :
-            );
+            // Save and restore register states using the MSVC way
+            // Because msvc does not support x64 inline assembly
+            CONTEXT savedContext = context;
+            
+            savedContext.Rbx = context.Rbx;
+            savedContext.Rsi = context.Rsi;
+            savedContext.Rdi = context.Rdi;
+            savedContext.R12 = context.R12;
+            savedContext.R13 = context.R13;
+            savedContext.R14 = context.R14;
+            savedContext.R15 = context.R15;
+            savedContext.Rsp = context.Rsp;
+            savedContext.Rip = context.Rip;
+            
+            // Using SEH to perform context switches
+            __try {
+                // Set the return value
+                savedContext.Rax = 1;
+                
+                // Use RtlRestoreContext to restore the context
+                RtlRestoreContext(&savedContext, NULL);
+            }
+            __except(EXCEPTION_EXECUTE_HANDLER) {
+                // If an exception occurs, return the original MessageBox
+                return RealMessageBoxW(hWnd, lpText, lpCaption, uType);
+            }
 #elif defined(_M_ARM64)
-            __asm__ volatile(
-                "ldr     x19, [%0, #0xa0]\n\t"
-                "ldr     x20, [%0, #0xa8]\n\t"
-                "ldr     x21, [%0, #0xb0]\n\t"
-                "ldr     x22, [%0, #0xb8]\n\t"
-                "ldr     x23, [%0, #0xc0]\n\t"
-                "ldr     x24, [%0, #0xc8]\n\t"
-                "ldr     x25, [%0, #0xd0]\n\t"
-                "ldr     x26, [%0, #0xd8]\n\t"
-                "ldr     x27, [%0, #0xe0]\n\t"
-                "ldr     x28, [%0, #0xe8]\n\t"
-
-                "ldr     x29, [%0, #0xf0]\n\t"
-                "ldr     x30, [%0, #0xf8]\n\t"
-
-                "mov     x0, #0x1        \n\t"
-                "mov     sp, %2          \n\t"
-                "br      %1              \n\t"
-                :
-                : "r"(&context), "r"(context.Pc), "r"(context.Sp)
-                : "x19", "x20", "x21", "x22", "x23", "x24",
-                  "x25", "x26", "x27", "x28", "x29", "x30"
-            );
+            // Save and restore register states using the MSVC way
+            // Because msvc does not support arm64 inline assembly
+            CONTEXT savedContext = context;
+            
+            savedContext.X19 = context.X19;
+            savedContext.X20 = context.X20;
+            savedContext.X21 = context.X21;
+            savedContext.X22 = context.X22;
+            savedContext.X23 = context.X23;
+            savedContext.X24 = context.X24;
+            savedContext.X25 = context.X25;
+            savedContext.X26 = context.X26;
+            savedContext.X27 = context.X27;
+            savedContext.X28 = context.X28;
+            savedContext.Fp = context.Fp;  // X29
+            savedContext.Lr = context.Lr;  // X30
+            
+            // Using SEH to perform context switches
+            __try {
+                // Set the return value
+                savedContext.X0 = 1;
+                
+                // Use RtlRestoreContext to restore the context
+                RtlRestoreContext(&savedContext, NULL);
+            }
+            __except(EXCEPTION_EXECUTE_HANDLER) {
+                // If an exception occurs, return the original MessageBox
+                return RealMessageBoxW(hWnd, lpText, lpCaption, uType);
+            }
 #else
 #error Restore context for this architecture!
 #endif
 
-            __builtin_unreachable();
+            // Replace __builtin_unreachable() with a MSVC compatible implementation
+            __assume(0);
         }
     }
 
