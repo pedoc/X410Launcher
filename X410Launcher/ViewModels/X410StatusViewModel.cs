@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -8,7 +7,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Xml.Serialization;
@@ -45,7 +43,13 @@ namespace X410Launcher.ViewModels
         public const string StatusTextUninstallCompleted = "Successfully uninstalled package.";
 
         public const string StatusTextKilled = "Sucessfully killed X410 process.";
-        public const string StatusTextStarted = "Sucessfully started X410 process.";
+
+        public const string StatusTextLaunching = "Starting X410 process...";
+        public const string StatusTextLaunchWaiting = "Waiting for response from X410 process...";
+        public const string StatusTextLaunched = "Sucessfully started X410 process.";
+        public const string StatusTextLaunchFailed = "Failed to start X410 process.";
+
+        public const string StatusTextCloseAppsFirst = "There are active X clients. Please close your apps before proceeding.";
 
         public const double ProgressIndeterminate = -1;
         public const double ProgressMin = 0;
@@ -53,6 +57,9 @@ namespace X410Launcher.ViewModels
 
         public const int DownloadMaxRetries = 128;
         public const int DownloadBufferSize = 32768;
+
+        public const int LaunchMaxRetries = 4;
+        public const int LaunchDelayMilliseconds = 1000;
 
         private string? _installedVersion;
 
@@ -62,12 +69,40 @@ namespace X410Launcher.ViewModels
             private set => SetProperty(ref _installedVersion, value);
         }
 
+        private string? _installedArchitecture;
+        public string? InstalledArchitecture
+        {
+            get => _installedArchitecture;
+            private set => SetProperty(ref _installedArchitecture, value);
+        }
+
         private string? _latestVersion;
 
         public string? LatestVersion
         {
             get => _latestVersion;
             private set => SetProperty(ref _latestVersion, value);
+        }
+
+        private bool _isRunning;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            private set => SetProperty(ref _isRunning, value);
+        }
+
+        private uint? _displayNumber;
+        public uint? DisplayNumber
+        {
+            get => _displayNumber;
+            private set => SetProperty(ref _displayNumber, value);
+        }
+
+        public string? _subscriptionStatus;
+        public string? SubscriptionStatus
+        {
+            get => _subscriptionStatus;
+            private set => SetProperty(ref _subscriptionStatus, value);
         }
 
         private ObservableCollection<PackageInfo> _packages = new();
@@ -112,7 +147,16 @@ namespace X410Launcher.ViewModels
         public string AppId
         {
             get => _appId;
-            private set => SetProperty(ref _appId, value);
+            private set
+            {
+                SetProperty(ref _appId, value);
+                OnPropertyChanged(nameof(StoreLink));
+            }
+        }
+
+        public string StoreLink
+        {
+            get => $"https://www.microsoft.com/store/apps/{_appId}";
         }
 
         private string _api = "https://store.rg-adguard.net/api/";
@@ -132,6 +176,7 @@ namespace X410Launcher.ViewModels
                 var deserializer = new XmlSerializer(typeof(Models.Appx.Package));
                 var package = deserializer.Deserialize(stream) as Models.Appx.Package;
                 InstalledVersion = package?.Identity?.VersionString;
+                InstalledArchitecture = package?.Identity?.ProcessorArchitecture.ToString();
             }
             else
             {
@@ -139,11 +184,31 @@ namespace X410Launcher.ViewModels
             }
         }
 
-        private static string _localPackageCache = Path.Combine(Paths.GetLauncherFileDirectory(), ".pkg-cache");
+        public void RefreshAppStatus()
+        {
+            IsRunning = X410.AreYouThere();
+            DisplayNumber = X410.GetDisplayNumber();
+            SubscriptionStatus = X410.GetSubscriptionStatus() switch
+            {
+                X410.SubscriptionStatus.SubscriptionActive
+                    => "Active",
+                X410.SubscriptionStatus.TrialValid
+                    => "Trial",
+                X410.SubscriptionStatus.SubscriptionExpired or
+                X410.SubscriptionStatus.TrialExpired
+                    => "Expired",
+                X410.SubscriptionStatus.NoAppUseEntitlement or
+                X410.SubscriptionStatus.StoreError
+                    => "Error",
+                X410.SubscriptionStatus.Unknown or _
+                    => "Unknown"
+            };
+        }
 
-        public async Task RefreshAsync(bool useLocalCache = true)
+        public async Task RefreshAsync()
         {
             RefreshInstalledVersion();
+            RefreshAppStatus();
 
             Packages.Clear();
             Progress = ProgressIndeterminate;
@@ -291,6 +356,21 @@ namespace X410Launcher.ViewModels
 
         public async Task InstallPackageAsync(int index)
         {
+            var wasRunning = false;
+
+            if (X410.AreYouThere())
+            {
+                wasRunning = true;
+
+                if (X410.HaveAnyXClient())
+                {
+                    StatusText = StatusTextCloseAppsFirst;
+                    throw new InvalidOperationException(StatusTextCloseAppsFirst);
+                }
+
+                await KillAsync();
+            }
+
             InstalledVersion = null;
 
             var selectedPackage = _packages[index];
@@ -433,31 +513,45 @@ namespace X410Launcher.ViewModels
                 {
                     if (helperStream is not null)
                     {
-                        StatusText = StatusTextExtractingHelper;
+                        var helperPath = Paths.GetHelperDllFile();
+                        StatusText = string.Format(StatusTextExtractingHelper, helperPath);
                         await Task.Run(() =>
                         {
                             using var memory = new MemoryStream();
                             helperStream.CopyTo(memory);
-                            File.WriteAllBytes(Paths.GetHelperDllFile(), memory.ToArray());
+                            File.WriteAllBytes(helperPath, memory.ToArray());
                         });
                     }
                 }
 
                 Progress = ProgressMax;
                 StatusText = StatusTextInstallCompleted;
-                RefreshInstalledVersion();
             }
             catch
             {
                 Progress = ProgressMin;
                 StatusText = StatusTextInstallFailed;
-                RefreshInstalledVersion();
                 throw;
+            }
+            finally
+            {
+                RefreshInstalledVersion();
+
+                if (wasRunning)
+                {
+                    await LaunchAsync();
+                }
             }
         }
 
         public async Task UninstallPackageAsync()
         {
+            if (X410.HaveAnyXClient())
+            {
+                StatusText = StatusTextCloseAppsFirst;
+                throw new InvalidOperationException(StatusTextCloseAppsFirst);
+            }
+
             await KillAsync();
 
             var appPath = Paths.GetAppInstallPath();
@@ -475,153 +569,86 @@ namespace X410Launcher.ViewModels
             StatusText = StatusTextUninstallCompleted;
         }
 
-        public async Task KillAsync()
+        public async Task<bool> KillAsync(bool force = false)
         {
+            if (!force && X410.HaveAnyXClient())
+            {
+                StatusText = StatusTextCloseAppsFirst;
+                return false;
+            }
+
             await Task.Run(() =>
             {
+                // Give the app a chance to exit cleanly.
+                while (X410.AppExit())
+                {
+                    continue;
+                }
+
                 foreach (var proc in Process.GetProcessesByName("X410"))
+                {
+                    proc.Kill();
+                }
+
+                // Kill any hanging settings menu as well.
+                foreach (var proc in Process.GetProcessesByName("X410.Settings"))
                 {
                     proc.Kill();
                 }
             });
 
+            RefreshAppStatus();
+
             StatusText = StatusTextKilled;
+            return true;
         }
 
-        public void Launch()
+        public async Task LaunchAsync()
         {
-            Launcher.Launch(Paths.GetAppFile());
+            StatusText = StatusTextLaunching;
 
-            StatusText = StatusTextStarted;
-        }
-
-        private void _ExtractPatched(
-            Models.Appx.ProcessorArchitecture architecture,
-            string fullPath,
-            byte[] data
-        )
-        {
-            StatusText = string.Format(StatusTextPatching, fullPath);
-
-            switch (architecture)
+            await Task.Run(async () =>
             {
-                case Models.Appx.ProcessorArchitecture.X64:
+                if (!X410.AreYouThere())
                 {
-                    var dataText = string.Concat(Array.ConvertAll(data, x => x.ToString("x2")));
-                    var matches = Regex.Matches(
-                        dataText,
-                        // push rbp
-                        "4055.{0,128}" +
-                        // mov rax, 0x8000000000000000
-                        // xor esi, esi
-                        "48b8000000000000008033f6.{0,128}?" +
-                        // mov status, si
-                        // mov expiry, rax
-                        "(668935(.{8}))(488905(.{8}))",
-                        RegexOptions.Compiled | RegexOptions.IgnoreCase
-                    );
-
-                    if (matches.Count != 1 && Debugger.IsAttached)
+                    try
                     {
-                        Debugger.Break();
+                        Launcher.Launch(Paths.GetAppFile());
                     }
-
-                    foreach (var match in matches.Cast<Match>())
+                    catch
                     {
-                        // All indices from the hex string are to be divided by two.
-                        var ip0 = match.Groups[1].Index / 2;
-                        var rel0 = _HexToUInt32(_StringToHex(match.Groups[2].Value).Reverse());
-                        var ip1 = match.Groups[3].Index / 2;
-                        var rel1 = _HexToUInt32(_StringToHex(match.Groups[4].Value).Reverse());
-
-                        var index = match.Index / 2;
-
-                        var head = new byte[]
-                        {
-                            // push rbp
-                            0x40, 0x55,
-                            // push rsi
-                            0x56,
-                            // mov rax, 0x7FFFFFFFFFFFFFFF
-                            0x48, 0xB8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F,
-                            // mov si, 0x1
-                            0x66, 0xBE, 0x01, 0x00
-                        };
-                        Array.Copy(head, 0, data, index, head.Length);
-                        index += head.Length;
-
-                        rel0 += unchecked((uint)(ip0 - index));
-                        var mov0 = new byte[]
-                        {
-                            // mov [memory location], si
-                            0x66, 0x89, 0x35
-                        };
-                        Array.Copy(mov0, 0, data, index, mov0.Length);
-                        index += mov0.Length;
-
-                        var movAddr0 = BitConverter.GetBytes(rel0);
-                        if (!BitConverter.IsLittleEndian)
-                        {
-                            movAddr0 = [.. movAddr0.Reverse()];
-                        }
-
-                        Array.Copy(movAddr0, 0, data, index, movAddr0.Length);
-                        index += movAddr0.Length;
-
-                        rel1 += unchecked((uint)(ip1 - index));
-                        var mov1 = new byte[]
-                        {
-                            // mov [memory location], rax
-                            0x48, 0x89, 0x05
-                        };
-                        Array.Copy(mov1, 0, data, index, mov1.Length);
-                        index += mov1.Length;
-
-                        var movAddr1 = BitConverter.GetBytes(rel1);
-                        if (!BitConverter.IsLittleEndian)
-                        {
-                            movAddr1 = [.. movAddr1.Reverse()];
-                        }
-
-                        Array.Copy(movAddr1, 0, data, index, movAddr1.Length);
-                        index += movAddr1.Length;
-
-                        var tail = new byte[]
-                        {
-                            // pop rsi
-                            0x5E,
-                            // pop rbp
-                            0x5D,
-                            // ret
-                            0xC3
-                        };
-                        Array.Copy(tail, 0, data, index, tail.Length);
-                        index += tail.Length;
+                        StatusText = StatusTextLaunchFailed;
+                        return;
                     }
                 }
-                    break;
-            }
 
-            File.WriteAllBytes(fullPath, data);
+                for (int i = 0; i < LaunchMaxRetries; ++i)
+                {
+                    if (X410.AreYouThere())
+                    {
+                        X410.SetFocus();
+
+                        // Launch settings app for more initial visibility.
+                        Launcher.LaunchSettings(Paths.GetSettingsAppFile());
+
+                        Progress = ProgressMax;
+                        StatusText = StatusTextLaunched;
+
+                        return;
+                    }
+
+                    Progress = -1;
+                    StatusText = StatusTextLaunchWaiting;
+
+                    await Task.Delay(LaunchDelayMilliseconds);
+                }
+
+                Progress = ProgressMin;
+                StatusText = StatusTextLaunchFailed;
+            });
+
+            RefreshAppStatus();
         }
-
-        private static byte[] _StringToHex(string s)
-        {
-            return
-            [
-                .. Enumerable.Range(0, s.Length / 2)
-                    .Select(x => Convert.ToByte(s.Substring(x * 2, 2), 16))
-            ];
-        }
-
-        private static uint _HexToUInt32(IEnumerable<byte> bytes)
-        {
-            if (BitConverter.IsLittleEndian)
-            {
-                bytes = [.. bytes.Reverse()];
-            }
-
-            return BitConverter.ToUInt32([..bytes], 0);
         }
     }
 }

@@ -23,11 +23,19 @@ public partial class HomePage : Page
         _model = (X410StatusViewModel)DataContext;
 
         RefreshButton_Click(null, null);
+
+        // Allow the user to launch/kill on page load without waiting for package list.
+        LaunchButton.IsEnabled = _model.InstalledVersion != null;
+        KillButton.IsEnabled = _model.InstalledVersion != null;
     }
 
     private void ApiHyperlink_Click(object sender, RoutedEventArgs e)
     {
         Process.Start(new ProcessStartInfo() { FileName = _model.Api, UseShellExecute = true });
+    }
+    private void StoreHyperlink_Click(object sender, RoutedEventArgs e)
+    {
+        Process.Start(new ProcessStartInfo() { FileName = _model.StoreLink, UseShellExecute = true });
     }
 
     #region Buttons
@@ -156,7 +164,20 @@ public partial class HomePage : Page
 
         try
         {
-            await _model.KillAsync();
+            if (!await _model.KillAsync())
+            {
+                var result = MessageBox.Show(
+                    "There are active X clients. Are you sure you want to kill X410? " +
+                    "You may lose any unsaved work.",
+                    "Kill X410",
+                    MessageBoxButton.YesNo
+                );
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    await _model.KillAsync(force: true);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -168,13 +189,13 @@ public partial class HomePage : Page
         }
     }
 
-    private void LaunchButton_Click(object sender, RoutedEventArgs e)
+    private async void LaunchButton_Click(object sender, RoutedEventArgs e)
     {
         DisableButtons();
 
         try
         {
-            _model.Launch();
+            await _model.LaunchAsync();
         }
         catch (Exception ex)
         {
